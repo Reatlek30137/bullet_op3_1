@@ -39,7 +39,7 @@ class OP3:
         self.targetVel = 0
         self.maxForce = 100
 
-        self.update_angle_th()
+        self.update_data_th()
         # We go real-time simulation rather than call stepSimulation
         p.setRealTimeSimulation(1)
         self._set_joint()
@@ -71,15 +71,38 @@ class OP3:
             self.set_angles(angles)
             time.sleep(0.1)
 
-    def update_angle_th(self):
-        def _cb_angles():
-            while True:
-                angles = []
-                for joint in range(self.numJoints):
-                    angles.append(p.getJointState(self.robot, joint)[0])
-                self.angles = angles
-                time.sleep(0.001)
-        Thread(target=_cb_angles).start()
+    def update_data_th(self, log_interval=None, log_file="torque_log.txt"):
+        """
+        更新角度與扭矩資訊，並可選擇性地將扭矩資訊寫入檔案。
+        :param log_interval: 紀錄扭矩的時間間隔（秒），若為 None 則不紀錄。
+        :param log_file: 紀錄扭矩的檔案名稱。
+        """
+        def _cb_datas():
+            last_log_time = time.time() 
+            with open(log_file, "w") as f: 
+                f.write("Time,Joint,Torque\n")
+                while True:
+                    angles = []
+                    joint_torques = []
+                    for joint in range(self.numJoints):
+                        joint_state = p.getJointState(self.robot, joint)
+                        angles.append(joint_state[0])
+                        joint_torques.append(joint_state[3])
+                    
+                    self.angles = angles
+                    self.joint_torques = joint_torques
+
+                    if log_interval is not None:
+                        current_time = time.time()
+                        if current_time - last_log_time >= log_interval:
+                            for joint_name, torque in zip(self.joints, self.joint_torques):
+                                f.write(f"{current_time},{joint_name},{torque}\n")
+                            last_log_time = current_time
+                            f.flush() 
+
+                    time.sleep(0.001)
+
+        Thread(target=_cb_datas).start()
 
     def _set_joint(self):
         for joint in range(self.numJoints):

@@ -83,7 +83,8 @@ class OP3:
 
     def _set_joint(self):
         for joint in range(self.numJoints):
-            print(p.getJointInfo(self.robot, joint))
+            self.JointInfo = p.getJointInfo(self.robot, joint)
+            print(self.JointInfo)
             p.setJointMotorControl(self.robot, joint, p.POSITION_CONTROL, self.targetVel, self.maxForce)
 
     def run(self):

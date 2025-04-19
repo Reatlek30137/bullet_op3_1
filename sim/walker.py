@@ -342,10 +342,16 @@ def get_distance(anglesa, anglesb):
 if __name__ == "__main__":
 
     op3 = OP3()
+    num_joints = op3.numJoints
     walker = Walker(op3)
     time.sleep(1)
     walker.start()
     walker.set_velocity(1, 0, 0)
 
     while True:
+        for joint_index in range(num_joints):
+            joint_info = op3.JointInfo
+            print(joint_info)
+            joint_name = joint_info[1].decode("utf-8")
+            print(f"Joint: {joint_name}", end="")
         time.sleep(0.5)

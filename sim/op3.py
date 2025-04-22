@@ -90,16 +90,18 @@ class OP3:
             self.set_angles(angles)
             time.sleep(0.1)
 
-    def update_data_th(self, log_interval=None, log_file="torque_log.txt"):
+    def update_data_th(self, log_interval=None, log_file="torque_log.csv"):
         """
         更新角度與扭矩資訊，並可選擇性地將扭矩資訊寫入檔案。
         :param log_interval: 紀錄扭矩的時間間隔（秒），若為 None 則不紀錄。
         :param log_file: 紀錄扭矩的檔案名稱。
         """
         def _cb_datas():
-            last_log_time = time.time() 
-            with open(log_file, "w") as f: 
-                f.write("Time,Joint,Torque\n")
+            last_log_time = time.time()
+            with open(log_file, "w") as f:
+                # 寫入 CSV 標頭，第一列為時間，後續列為關節名稱
+                f.write("time," + ",".join(self.joints) + "\n")
+
                 while True:
                     angles = []
                     joint_torques = []
@@ -107,17 +109,18 @@ class OP3:
                         joint_state = p.getJointState(self.robot, joint)
                         angles.append(joint_state[0])
                         joint_torques.append(joint_state[3])
-                    
+
                     self.angles = angles
                     self.joint_torques = joint_torques
 
+                    # 如果設定了 log_interval，則進行紀錄
                     if log_interval is not None:
                         current_time = time.time()
                         if current_time - last_log_time >= log_interval:
-                            for joint_name, torque in zip(self.joints, self.joint_torques):
-                                f.write(f"{current_time},{joint_name},{torque}\n")
+                            # 寫入當前時間和所有關節的扭矩值
+                            f.write(f"{current_time}," + ",".join(map(str, self.joint_torques)) + "\n")
                             last_log_time = current_time
-                            f.flush() 
+                            f.flush()  # 確保即時寫入檔案
 
                     time.sleep(0.001)
 

@@ -394,7 +394,7 @@ def get_distance(anglesa, anglesb):
 if __name__ == "__main__":
 
     op3 = OP3()
-    op3.update_data_th(log_interval=0.5, log_file="./torque_log.txt") #log torque data to file
+    op3.update_data_th(log_interval=0.25, log_file="./torque_log.csv") #log torque data to file, interval should less than 0.25s
     walker = Walker(op3)
     time.sleep(1)
     walker.start()

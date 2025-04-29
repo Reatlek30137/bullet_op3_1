@@ -27,6 +27,12 @@ op3_joints = ['l_hip_yaw',
 
 class OP3:
     def __init__(self):
+        """
+        初始化 OP3 機器人模擬環境
+        - 連接到 PyBullet 模擬器
+        - 加載平面和機器人模型
+        - 設定重力和初始參數
+        """
         self.physicsClient = p.connect(p.GUI)  # or p.DIRECT for non-graphical version
         p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optionally
@@ -41,18 +47,26 @@ class OP3:
 
         self.update_data_th()
         # We go real-time simulation rather than call stepSimulation
-        self.run_sim_th()
+        p.setRealTimeSimulation(1)
         self._set_joint()
 
         self.joints = op3_joints
         self.angles = None
 
     def get_angles(self):
+        """
+        獲取當前機器人所有關節的角度。
+        :return: 字典形式的關節名稱與角度對應關係，若無數據則返回 None。
+        """
         if self.joints is None: return None
         if self.angles is None: return None
         return dict(zip(self.joints, self.angles))
 
     def set_angles(self, angles):
+        """
+        設定機器人關節的目標角度。
+        :param angles: 字典形式的關節名稱與目標角度對應關係。
+        """
         for j, v in angles.items():
             if j not in self.joints:
                 AssertionError("Invalid joint name " + j)
@@ -60,6 +74,11 @@ class OP3:
             p.setJointMotorControl(self.robot, op3_joints.index(j), p.POSITION_CONTROL, v, self.maxForce)
 
     def set_angles_slow(self, stop_angles, delay=2):
+        """
+        緩慢地將機器人關節移動到目標角度。
+        :param stop_angles: 字典形式的關節名稱與目標角度對應關係。
+        :param delay: 移動過程的持續時間（秒）。
+        """
         start_angles = self.get_angles()
         start = time.time()
         stop = start + delay
@@ -108,18 +127,18 @@ class OP3:
         Thread(target=_cb_datas).start()
 
     def _set_joint(self):
+        """
+        初始化機器人所有關節的控制模式與參數。
+        """
         for joint in range(self.numJoints):
-            print(p.getJointInfo(self.robot, joint))
+            self.JointInfo = p.getJointInfo(self.robot, joint)
+            print(self.JointInfo)
             p.setJointMotorControl(self.robot, joint, p.POSITION_CONTROL, self.targetVel, self.maxForce)
 
-    def run_sim_th(self):
-        def _cb_sim():
-            while True:
-                p.stepSimulation()
-                time.sleep(1.0 / (240.0))
-        Thread(target=_cb_sim).start()
-
     def run(self):
+        """
+        運行機器人模擬，並持續更新模擬狀態。
+        """
         try:
             while True:
                 # p.stepSimulation()
@@ -131,6 +150,13 @@ class OP3:
 
 
 def interpolate(anglesa, anglesb, coefa):
+    """
+    插值計算兩組角度之間的中間值。
+    :param anglesa: 起始角度的字典。
+    :param anglesb: 終止角度的字典。
+    :param coefa: 插值係數（0 到 1）。
+    :return: 插值後的角度字典。
+    """
     z = {}
     joints = anglesa.keys()
     for j in joints:

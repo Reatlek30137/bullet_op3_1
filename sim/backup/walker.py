@@ -2,7 +2,7 @@
 import time
 from threading import Thread
 import math
-import pybullet as p
+
 from op3 import OP3
 
 
@@ -13,17 +13,32 @@ class WJFunc:
     """
 
     def __init__(self):
+        """
+        初始化 WJFunc 類別。
+        - offset: 正弦波的偏移量。
+        - scale: 正弦波的幅度。
+        - in_offset: 正弦波的相位偏移。
+        - in_scale: 正弦波的頻率縮放。
+        """
         self.offset = 0
         self.scale = 1
         self.in_offset = 0
         self.in_scale = 1
 
     def get(self, x):
-        """ x between 0 and 1"""
+        """
+        計算正弦波函數的值。
+        :param x: 輸入值，範圍為 0 到 1。
+        :return: 正弦波函數的輸出值。
+        """
         f = math.sin(self.in_offset + self.in_scale * x)
         return self.offset + self.scale * f
 
     def clone(self):
+        """
+        複製當前的 WJFunc 實例。
+        :return: 新的 WJFunc 實例，具有相同的參數。
+        """
         z = WJFunc()
         z.offset = self.offset
         z.scale = self.scale
@@ -32,90 +47,60 @@ class WJFunc:
         return z
 
     def mirror(self):
+        """
+        創建一個鏡像版本的 WJFunc。
+        :return: 鏡像的 WJFunc 實例。
+        """
         z = self.clone()
         z.offset *= -1
         z.scale *= -1
         return z
 
-    def copy_to(self, wj):
-        wj.offset = self.offset
-        wj.scale = self.scale
-        wj.in_offset = self.in_offset
-        wj.in_scale = self.in_scale
-    
-    def mirror_to(self, wj):
-        self.copy_to(wj)
-        wj.offset *= -1
-        wj.scale *= -1
-
-    def update_param_th(self):
-        def _update_param():
-            while True:
-                for k, v in self.param_sliders.items():
-                    self.parameters[k] = -p.readUserDebugParameter(v)
-                for k, v in self.ang_sliders.items():
-                    offset = p.readUserDebugParameter(v)
-                    self.ang_offsets["l_" + k] = offset
-                    self.ang_offsets["r_" + k] = -offset
-
-                time.sleep(0.001)
-        Thread(target=_update_param).start()
-
-
     def __str__(self):
+        """
+        返回正弦波函數的字串表示。
+        :return: 字串形式的函數表示。
+        """
         return "y=%f+%f*sin(%f+%f*x)" % (self.offset, self.scale, self.in_offset, self.in_scale)
 
 
 class WFunc:
     """
     Multi-joint walk function for Darwin
+    提供多關節的步態函數，基於 CPG（中央模式生成器）。
     """
 
     def __init__(self, **kwargs):
-        walk_offset = {'hip_pitch': -0.063,
-                       'hip_roll': 0.0,
-                       'hip_yaw': 0.0,
-                       'ank_pitch': 0.0,
-                       'ank_roll': 0.0,
-                       'knee': 0.0}
+        """
+        初始化 WFunc 類別。
+        :param kwargs: 可選參數，用於覆蓋默認的步態參數。
+        - swing_scale: 擺動幅度的縮放因子。
+        - step_scale: 步幅的縮放因子。
+        - step_offset: 步態的偏移量。
+        - ankle_offset: 腳踝的偏移量。
+        - vx_scale: 前進速度的縮放因子。
+        - vy_scale: 側向速度的縮放因子。
+        - vt_scale: 旋轉速度的縮放因子。
+        """
+        self.parameters = {}
 
-        self.parameters = {"swing_scale": 0.0,
-                            "step_scale": 0.1,
-                            "step_offset": 0.25,
-                            "ankle_offset": 0.0,
-                            "vx_scale": 0.2,
-                            "vy_scale": 0.2,
-                            "vt_scale": 0.1}
-        self.ang_offsets = {}
-        self.param_sliders = {}
-        self.ang_sliders = {}
-        for k, v in self.parameters.items():
-            self.param_sliders[k] = p.addUserDebugParameter(k, -3, 3, v)
-        for k, v in walk_offset.items():
-            self.ang_sliders[k] = p.addUserDebugParameter(k, -3, 3, v)
-        self.update_param_th()
-        while not self.ang_offsets:
-            print("wait parameters to propagated")
+        self.parameters["swing_scale"] = 0.0
+        self.parameters["step_scale"] = 0.1
+        self.parameters["step_offset"] = 0.25
+        self.parameters["ankle_offset"] = 0
+        self.parameters["vx_scale"] = 0.2
+        self.parameters["vy_scale"] = 0.2
+        self.parameters["vt_scale"] = 0.1
+
         for k, v in kwargs.items():
             self.parameters[k] = v
-        self.generate_init()
 
-    def update_param_th(self):
-        def _update_param():
-            while True:
-                for k, v in self.param_sliders.items():
-                    self.parameters[k] = -p.readUserDebugParameter(v)
-                for k, v in self.ang_sliders.items():
-                    offset = p.readUserDebugParameter(v)
-                    self.ang_offsets["l_" + k] = offset
-                    self.ang_offsets["r_" + k] = -offset
+        self.generate()
 
-                time.sleep(0.001)
-        Thread(target=_update_param).start()
-
-    def generate_init(self):
+    def generate(self):
         """
         Build CPG functions for walk-on-spot (no translation or rotation, only legs up/down)
+        構建步態函數，用於原地步態（無平移或旋轉，僅腿部上下移動）。
         """
         # f1=THIGH1=ANKLE1=L=R in phase
         self.pfn = {}  # phase joint functions
@@ -124,7 +109,7 @@ class WFunc:
         # ~ print f
         f1 = WJFunc()
         f1.in_scale = math.pi
-        f1.scale = -self.parameters["swing_scale"]
+        f1.scale = self.parameters["swing_scale"]
         self.pfn["l_ank_roll"] = f1
         self.pfn["l_hip_roll"] = f1
 
@@ -137,7 +122,7 @@ class WFunc:
         f3 = WJFunc()
         f3.in_scale = math.pi
         f3.scale = self.parameters["step_scale"]
-        f3.offset = self.parameters["step_offset"]
+        f3.offset = -self.parameters["step_offset"]
         self.pfn["l_hip_pitch"] = f3
         f33 = f3.mirror()
         f33.offset += self.parameters["ankle_offset"]
@@ -148,9 +133,10 @@ class WFunc:
         f4.scale *= 2
         self.pfn["l_knee"] = f4
 
+        s2 = 0
         f5 = f3.clone()
         f5.in_scale *= 2
-        f5.scale = 0
+        f5.scale = s2
         self.afn["l_hip_pitch"] = f5
 
         f6 = f3.mirror()
@@ -165,95 +151,60 @@ class WFunc:
 
         self.forward = [f5, f6]
 
-        self.generate_right_init()
+        self.generate_right()
         self.joints = self.pfn.keys()
 
         self.show()
 
-    def generate_right_init(self):
+    def generate_right(self):
         """
         Mirror CPG functions from left to right and antiphase right
+        從左側鏡像生成右側的步態函數。
         """
         l = [v[2:] for v in self.pfn.keys()]
         for j in l:
             self.pfn["r_" + j] = self.afn["l_" + j].mirror()
             self.afn["r_" + j] = self.pfn["l_" + j].mirror()
 
-    def generate(self):
-        # ~ print f
-        f1 = self.pfn["l_ank_roll"]
-        f1.scale = -self.parameters["swing_scale"]
-        self.pfn["l_hip_roll"] = f1
-
-        # f2=mirror f1 in antiphase
-        f1.mirror_to(self.afn["l_ank_roll"])
-        f1.mirror_to(self.afn["l_hip_roll"])
-        # ~ f2=WJFunc()
-
-        f3 = self.pfn["l_hip_pitch"]
-        f3.scale = self.parameters["step_scale"]
-        f3.offset = self.parameters["step_offset"]
-
-        f33 = self.pfn["l_ank_pitch"]
-        f3.mirror_to(f33)
-        f33.offset += self.parameters["ankle_offset"]
-
-        f4 = self.pfn["l_knee"]
-        f3.mirror_to(f4)
-        f4.offset *= 2
-        f4.scale *= 2
-
-        f5 = self.afn["l_hip_pitch"]
-        f3.copy_to(f5)
-        f5.in_scale *= 2
-        f5.scale = 0
-
-        f6 = self.afn["l_ank_pitch"]
-        f3.mirror_to(f6)
-        f6.in_scale *= 2
-        f6.scale = f5.scale
-        f6.offset += self.parameters["ankle_offset"]
-
-        f7 = self.afn["l_knee"]
-        f4.copy_to(f7)
-        f7.scale = 0
-
-        self.generate_right()
-
-    def generate_right(self):
-        """
-        Mirror CPG functions from left to right and antiphase right
-        """
-        l = [v[2:] for v in self.pfn.keys()]
-        for j in l:
-            self.afn["l_" + j].mirror_to(self.pfn["r_" + j])
-            self.pfn["l_" + j].mirror_to(self.afn["r_" + j])
-
     def get(self, phase, x, velocity):
-        """ Obtain the joint angles for a given phase, position in cycle (x 0,1)) and velocity parameters """
-        self.generate()
+        """
+        Obtain the joint angles for a given phase, position in cycle (x 0,1)) and velocity parameters 
+        獲取給定相位、步態位置和速度參數的關節角度。
+        :param phase: 布林值，表示當前是否處於同相位。
+        :param x: 步態循環中的位置（0 到 1）。
+        :param velocity: 速度向量 [vx, vy, vt]。
+        :return: 字典形式的關節角度。
+        """
         angles = {}
         for j in self.pfn.keys():
             if phase:
-                angles[j] = self.ang_offsets[j] + self.pfn[j].get(x)
+                v = self.pfn[j].get(x)
+                angles[j] = v
             else:
-                angles[j] = self.ang_offsets[j] + self.afn[j].get(x)
+                angles[j] = self.afn[j].get(x)
         self.apply_velocity(angles, velocity, phase, x)
         return angles
 
     def show(self):
         """
         Display the CPG functions used
+        顯示使用的步態函數。
         """
         for j in self.pfn.keys():
             print(j, "p", self.pfn[j], "a", self.afn[j])
 
     def apply_velocity(self, angles, velocity, phase, x):
-        """ Modify on the walk-on-spot joint angles to apply the velocity vector"""
+        """ 
+        Modify on the walk-on-spot joint angles to apply the velocity vector
+        根據速度向量修改步態關節角度。
+        :param angles: 當前的關節角度字典。
+        :param velocity: 速度向量 [vx, vy, vt]。
+        :param phase: 布林值，表示當前是否處於同相位。
+        :param x: 步態循環中的位置（0 到 1）。
+        """
 
         # VX
         v = velocity[0] * self.parameters["vx_scale"]
-        # print(velocity)
         d = (x * 2 - 1) * v
         if phase:
             angles["l_hip_pitch"] += d
@@ -311,6 +262,7 @@ class WFunc:
             else:
                 angles["l_hip_yaw"] = d
                 angles["r_hip_yaw"] = -d
+
 
 class Walker:
     """
@@ -441,13 +393,13 @@ def get_distance(anglesa, anglesb):
 
 if __name__ == "__main__":
 
-    set_time_interval = 0.25
     op3 = OP3()
-    op3.update_data_th(log_interval=set_time_interval, log_file="./torque_log.csv") #log torque data to file, interval should less than 0.25s
+    op3.update_data_th(log_interval=0.25, log_file="./torque_log.csv") #log torque data to file, interval should less than 0.25s
     walker = Walker(op3)
     time.sleep(1)
     walker.start()
     walker.set_velocity(1, 0, 0)
 
     while True:
-        time.sleep(0.5)
+        # print("Joint Torques:", op3.joint_torques)
+        time.sleep(0.25)

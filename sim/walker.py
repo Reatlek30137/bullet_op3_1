@@ -401,5 +401,5 @@ if __name__ == "__main__":
     walker.set_velocity(1, 0, 0)
 
     while True:
-        print("Joint Torques:", op3.joint_torques)
-        time.sleep(0.5)
+        # print("Joint Torques:", op3.joint_torques)
+        time.sleep(0.25)

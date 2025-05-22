@@ -1,5 +1,6 @@
 import time
 from threading import Thread
+import numpy as np
 
 import pybullet_data
 import pybullet as p
@@ -28,7 +29,7 @@ op3_joints = ['l_hip_yaw',
 class OP3:
     def __init__(self):
         self.physicsClient = p.connect(p.GUI)  # or p.DIRECT for non-graphical version
-        p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
+        p.configureDebugVisualizer(p.COV_ENABLE_GUI, 1)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optionally
         p.setGravity(0, 0, -9.8)
         op3StartPos = [0, 0, 0.3]
@@ -46,6 +47,14 @@ class OP3:
 
         self.joints = op3_joints
         self.angles = None
+    
+    def get_position(self):
+        position, _ = p.getBasePositionAndOrientation(self.robot)
+        return np.array(position)
+
+    def camera_follow(self, distance=1.0, pitch=-35.0, yaw=50.0):
+        lookat = self.get_position() - [0, 0, 0.1]
+        p.resetDebugVisualizerCamera(distance, yaw, pitch, lookat)
 
     def get_angles(self):
         if self.joints is None: return None
@@ -71,7 +80,7 @@ class OP3:
             self.set_angles(angles)
             time.sleep(0.1)
 
-    def update_data_th(self, log_interval=None, log_file="torque_log.csv"):
+    def update_data_th(self, log_interval=None, log_file="./data/torque_log.csv"):
         """
         更新角度與扭矩資訊，並可選擇性地將扭矩資訊寫入檔案。
         :param log_interval: 紀錄扭矩的時間間隔（秒），若為 None 則不紀錄。
@@ -117,6 +126,7 @@ class OP3:
             while True:
                 p.stepSimulation()
                 time.sleep(1.0 / (240.0))
+                self.camera_follow(distance=0.5)
         Thread(target=_cb_sim).start()
 
     def run(self):

@@ -42,7 +42,7 @@ class WJFunc:
         wj.scale = self.scale
         wj.in_offset = self.in_offset
         wj.in_scale = self.in_scale
-    
+
     def mirror_to(self, wj):
         self.copy_to(wj)
         wj.offset *= -1
@@ -72,20 +72,20 @@ class WFunc:
     """
 
     def __init__(self, **kwargs):
-        walk_offset = {'hip_pitch': -0.063,
-                       'hip_roll': 0.0,
-                       'hip_yaw': 0.0,
-                       'ank_pitch': 0.0,
-                       'ank_roll': 0.0,
-                       'knee': 0.0}
+        walk_offset = {'hip_pitch': -0.063,         # 1  彎腰幅度
+                       'hip_roll': 0.0,             # -1 大腿掰開(?)  
+                       'hip_yaw': 0.0,              # -1 no use
+                       'ank_pitch': 0.0,            # -1 same as ankle_offset
+                       'ank_roll': 0.0,             # -1 腳踝骨折(左右)
+                       'knee': 0.0}                 # -1 下跪
 
-        self.parameters = {"swing_scale": 0.0,
-                            "step_scale": 0.1,
-                            "step_offset": 0.25,
-                            "ankle_offset": 0.0,
-                            "vx_scale": 0.2,
-                            "vy_scale": 0.2,
-                            "vt_scale": 0.1}
+        self.parameters = {"swing_scale": 0.0,      # 0
+                            "step_scale": 0.1,      # 0
+                            "step_offset": 0.25,    # 0
+                            "ankle_offset": 0.0,    # 1
+                            "vx_scale": 0.2,        # 0
+                            "vy_scale": 0.2,        # shift
+                            "vt_scale": 0.1}        # turn
         self.ang_offsets = {}
         self.param_sliders = {}
         self.ang_sliders = {}
@@ -443,11 +443,11 @@ if __name__ == "__main__":
 
     set_time_interval = 0.25
     op3 = OP3()
-    op3.update_data_th(log_interval=set_time_interval, log_file="./torque_log.csv") #log torque data to file, interval should less than 0.25s
+    op3.update_data_th(log_interval=set_time_interval, log_file="./data/torque_log.csv") #log torque data to file, interval should less than 0.25s
     walker = Walker(op3)
     time.sleep(1)
     walker.start()
-    walker.set_velocity(1, 0, 0)
+    walker.set_velocity(1, 0, 0)  # Change the velocity here
 
     while True:
         time.sleep(0.5)
